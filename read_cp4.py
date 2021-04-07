@@ -1,11 +1,11 @@
 #------------------------------------------------------
 # Code to read CP4 explicit convection data for present or future from the CEDA archive
 # inputs:
-#     present_future: the string 'present' or 'future'
 #     temporal: the string '1hr' or 'mon'
 #     variable: the variable to read eg tas
 #     start_year, start_month, end_year and end_month define the time period for which data is returned
-#     these are optional and if not given all 10 years are returned
+#     present data is for 1997/03 to 2007/02
+#     future data is for 2095/03 to 2105/02
 # returns the iris cube with requested data
 #------------------------------------------------------
 
@@ -13,8 +13,13 @@ import warnings
 import iris
 from iris.experimental.equalise_cubes import equalise_attributes
 
-def read_cp4(present_future, temporal, variable, start_year=1997, start_month=3, end_year=2007, end_month=2):
+def read_cp4(temporal, variable, start_year, start_month, end_year, end_month):
 
+    if start_year <=2007:
+        present_future='present'
+    else:
+        present_future='future'
+        
     # match variable names with longer names used in directory structure
     var_directory=dict()
     var_directory['psl']='mean_sea_level_pressure'
@@ -32,6 +37,7 @@ def read_cp4(present_future, temporal, variable, start_year=1997, start_month=3,
     basedir='/badc/impala/data/explicit-4km/'+present_future+'/'+temporal+'/'+var_directory[variable]+'/'
     all_cubes=iris.cube.CubeList()
     varConstraint=iris.Constraint(cube_func=(lambda c: c.var_name == variable))
+    print('reading {y:02d}/{m:02d} to {y2:02d}/{m2:02d}'.format(y=start_year,m=start_month,y2=end_year,m2=end_month))
     for y in range(start_year,end_year+1):
         if temporal=='mon':
             ncdir=basedir
@@ -45,7 +51,8 @@ def read_cp4(present_future, temporal, variable, start_year=1997, start_month=3,
                 last_month=nmonths_per_year
             first_date_str='{y:02d}{m:02d}-'.format(y=y,m=first_month)
             last_date_str='{y:02d}{m:02d}'.format(y=y,m=last_month)
-            filename=variable+'_explicit-4km_present_'+first_date_str+last_date_str+'.nc'
+            filename=variable+'_explicit-4km_'+present_future+'_'+first_date_str+last_date_str+'.nc'
+            #print('opening', filename)
             try:
                 this_cube = iris.load_cube(ncdir+filename,varConstraint)
             except OSError as err:
@@ -60,8 +67,8 @@ def read_cp4(present_future, temporal, variable, start_year=1997, start_month=3,
                     break
                 ncdir=basedir+'{y:02d}/{m:02d}/'.format(y=y, m=m)
                 for d in range(ndays_per_month):
-                    filename=variable+'_explicit-4km_present_'+'{y:02d}{m:02d}{d:02d}.nc'.format(y=y,m=m,d=d+1)
-                    print('opening', filename)
+                    filename=variable+'_explicit-4km_'+present_future+'_{y:02d}{m:02d}{d:02d}.nc'.format(y=y,m=m,d=d+1)
+                    #print('opening', filename)
                     try:
                         this_cube = iris.load_cube(ncdir+filename,varConstraint)
                     except OSError as err:
