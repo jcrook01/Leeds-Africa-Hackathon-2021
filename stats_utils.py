@@ -82,7 +82,7 @@ def get_heatwave(tasmax, tas90th, nconsecutive_days):
         for x in range(nlon):
             hot=np.zeros(nt+2) # add an element at beginning and end compared to tasmax
             # where is the tasmax greater than or equal to the 90th percentile tas
-            hotix=np.where(tasmax[:,y,x] >= tas90th[:,y,x])
+            hotix=np.where(tasmax[:,y,x] >= tas90th[y,x])
             hot[hotix[0]+1]=1
             diffs=np.diff(hot) # this is 1 where it becomes hot and -1 where it becomes cold and 0 where it stays the same
             # get indices where changes occur
