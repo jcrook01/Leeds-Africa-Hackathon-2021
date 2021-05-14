@@ -1,5 +1,6 @@
 #------------------------------------------------------------------
 # Code to calculate 50th percentile of the CP4 data for each month
+#     RUN THIS OUTSIDE THE NOTEBOOK
 #------------------------------------------------------------------
 # History:
 #     created by Julia Crook
@@ -7,7 +8,7 @@
 from get_lon_lat_str import *
 from stats_utils import *
 from iris.experimental.equalise_cubes import equalise_attributes
-import pdb
+import os.path
 
 #------------------------------------------------------------------
 # get daily data for requested month for all years
@@ -18,7 +19,7 @@ import pdb
 #    varConstraint: irisConstraint used to read the data
 #    varname: the more common varname used in directory names, eg tasmax
 #------------------------------------------------------------------
-def get_daily_cp4_data_for_month(explicit, present, lonlat_str, varConstraint, varname, month):
+def get_cp4_daily_data_for_month(explicit, present, lonlat_str, varConstraint, varname, month):
     if explicit:
         explicit_str='explicit-4km'
     else:
@@ -45,7 +46,7 @@ def get_daily_cp4_data_for_month(explicit, present, lonlat_str, varConstraint, v
         if y==end_year and month>end_month:
             break
         filename=filebase+'{y:04d}{m:02d}_'.format(y=y,m=month)+lonlat_str+'.nc'
-        print('reading', ncdir+filename)
+        #print('reading', ncdir+filename)
         try:
             this_cube = iris.load_cube(ncdir+filename, varConstraint)
         except OSError as err:
@@ -61,7 +62,7 @@ def get_daily_cp4_data_for_month(explicit, present, lonlat_str, varConstraint, v
 #------------------------------------------------------------------
 # for each month, calculate nth percentile and save in netcdf
 # Inputs:
-#    explicit: if True use explicit 4km data, otherwise use the parameterised 25km data
+#    explicit_str: 'explicit-4km' or 'param-25km'
 #    present: if True use present data, otherwise use future data
 #    lonlat_str: the region string used to find daily data and to use in output files
 #    varConstraint: irisConstraint used to read the data
@@ -70,13 +71,25 @@ def get_daily_cp4_data_for_month(explicit, present, lonlat_str, varConstraint, v
 #------------------------------------------------------------------
 def get_cp4_nth_percentile(explicit, present, lonlat_str, varConstraint, varname, percentile):
 
+    if explicit:
+        explicit_str='explicit-4km'
+    else:
+        explicit_str='param-25km'
+    if present:
+        present_future='present'
+    else:
+        present_future='future'
+
     nmonths_per_year=12
     ncdir='/gws/pw/j05/cop26_hackathons/leeds/CP4/'+explicit_str+'/'+present_future+'/'+varname+'/'
     filebase=explicit_str+'_daily_'+varname+'_'
     for m in range(1,nmonths_per_year+1):
-        cp4_data=get_daily_cp4_data_for_month(explicit, present, lonlat_str, stash_code, varname, month)
+        cp4_data=get_cp4_daily_data_for_month(explicit, present, lonlat_str, varConstraint, varname, m)
         outfile=ncdir+filebase+'{p:0d}th_percentile_{m:02d}_'.format(p=percentile,m=m)+lonlat_str+'.nc'
-        create_data_nth_percentile(cp4_data, percentile, outfile)
+        if os.path.isfile(outfile):
+            print(outfile, 'exists')
+        else:
+            create_data_nth_percentile(cp4_data, percentile, outfile)
 
 #------------------------------------------------------------------
 #------------------------------------------------------------------
@@ -93,64 +106,41 @@ def main():
     explicit=True
     explicit_str='explicit-4km'
     #-----------------
-    #  Do for tasmax
+    #  Do for tasmax and pr
     #-----------------
-    #----------------------------------------------------------------------------
-    # create 50th percentile of future tasmax 
-    #----------------------------------------------------------------------------
-    present=False
-    stash_code='m01s03i236' # daily data needs to be read with stash code
-    varConstraint = iris.AttributeConstraint(STASH=stash_code)
-    varname='tasmax'
-    get_cp4_nth_percentile(explicit, present, lonlat_str, varConstraint, varname, 50)
-
-    #----------------------------------------------------------------------------
-    # create 50th percentile of current tasmax 
-    #----------------------------------------------------------------------------
-    present=True
-    get_cp4_nth_percentile(explicit, present, lonlat_str, varConstraint, varname, 50)
+    stash_codes=['m01s03i236','m01s04i203'] # daily data needs to be read with stash code
+    varnames=['tasmax','pr']
+    nvars=len(varnames)
+    nvars=1
     
-    #----------------------------------------------------------------------------
-    # create where 50th percentile of future tasmax sits within historical tasmax
-    #----------------------------------------------------------------------------
-    outdir='/gws/pw/j05/cop26_hackathons/leeds/CP4/'+explicit_str+'/future/'+varname+'/'
-    outfile_fc_vs_cc=outdir+explicit_str+'_daily_'+varname+'_as_cc_percentile_'
-    outfile_fc=outdir+explicit_str+'_daily_'+varname+'_50th_percentile_'
-    for m in range(1,nmonths_per_year+1):
-        this_file_fc=outfile_fc+'{m:02d}_'.format(m=m)+lonlat_str+'.nc'
-        this_cc_data=get_cp4_daily_data_for_month(explicit, present, lonlat_str, varConstraint, varname, m)
-        this_outfile=outfile_fc_vs_cc+'{m:02d_}'.format(m=m)+lonlat_str+'.nc'
-        create_future_data_as_percentile_of_current(this_file_fc, varConstraint, this_cc_data, this_outfile)
+    for n in range(nvars):
+        varConstraint = iris.AttributeConstraint(STASH=stash_codes[n])
+        #----------------------------------------------------------------------------
+        # create 50th percentile of future  
+        #----------------------------------------------------------------------------
+        present=False
+        get_cp4_nth_percentile(explicit, present, lonlat_str, varConstraint, varnames[n], 50)
 
-    #-----------------
-    #  Do for pr
-    #-----------------
-    #----------------------------------------------------------------------------
-    # create 50th percentile of future pr 
-    #----------------------------------------------------------------------------
-    present=False
-    stash_code='m01s04i203'
-    varConstraint = iris.AttributeConstraint(STASH=stash_code)
-    varname='pr'
-    get_cp4_nth_percentile(explicit, present, lonlat_str, varConstraint, varname)
-
-    #----------------------------------------------------------------------------
-    # create 50th percentile of current tasmax 
-    #----------------------------------------------------------------------------
-    present=True
-    get_cp4_nth_percentile(explicit, present, lonlat_str, varConstraint, varname)
+        #----------------------------------------------------------------------------
+        # create 50th percentile of current 
+        #----------------------------------------------------------------------------
+        present=True
+        get_cp4_nth_percentile(explicit, present, lonlat_str, varConstraint, varnames[n], 50)
     
-    #----------------------------------------------------------------------------
-    # create where 50th percentile of future pr sits within historical tasmax
-    #----------------------------------------------------------------------------
-    outdir='/gws/pw/j05/cop26_hackathons/leeds/CP4/'+explicit_str+'/future/'+varname+'/'
-    outfile_fc_vs_cc=outdir+explicit_str+'_daily_'+varname+'_as_cc_percentile_'
-    outfile_fc=outdir+explicit_str+'_daily_'+varname+'_50th_percentile_'
-    for m in range(1,nmonths_per_year+1):
-        this_file_fc=outfile_fc+'_{m:02d}_'.format(m=m)+lonlat_str+'.nc'
-        this_cc_data=get_cp4_daily_data_for_month(explicit, present, lonlat_str, varConstraint, varname, m)
-        this_outfile=outfile_fc_vs_cc+'_{m:02d}'.format(m=m)+lonlat_str+'.nc'
-        create_future_data_as_percentile_of_current(this_file_fc, varConstraint, this_cc_data, this_outfile)
+        #----------------------------------------------------------------------------
+        # create where 50th percentile of future sits within historical 
+        #----------------------------------------------------------------------------
+        outdir='/gws/pw/j05/cop26_hackathons/leeds/CP4/'+explicit_str+'/future/'+varnames[n]+'/'
+        outfile_fc_vs_cc=outdir+explicit_str+'_daily_'+varnames[n]+'_as_cc_percentile_'
+        outfile_fc=outdir+explicit_str+'_daily_'+varnames[n]+'_50th_percentile_'
+        for m in range(1,nmonths_per_year+1):
+            this_file_fc=outfile_fc+'{m:02d}_'.format(m=m)+lonlat_str+'.nc'
+            this_cc_data=get_cp4_daily_data_for_month(explicit, present, lonlat_str, varConstraint, varnames[n], m)
+            this_outfile=outfile_fc_vs_cc+'{m:02d}_'.format(m=m)+lonlat_str+'.nc'
+            if os.path.isfile(this_outfile):
+                print(this_outfile, 'exists')
+            else:
+                create_future_data_as_percentile_of_current(this_file_fc, varConstraint, this_cc_data, this_outfile)
 
 
 if __name__=='__main__':
