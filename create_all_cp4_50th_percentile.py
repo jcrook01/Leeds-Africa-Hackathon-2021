@@ -62,7 +62,7 @@ def get_cp4_daily_data_for_month(explicit, present, lonlat_str, varConstraint, v
 #------------------------------------------------------------------
 # for each month, calculate nth percentile and save in netcdf
 # Inputs:
-#    explicit_str: 'explicit-4km' or 'param-25km'
+#    explicit: if True use explicit 4km data, otherwise use the parameterised 25km data
 #    present: if True use present data, otherwise use future data
 #    lonlat_str: the region string used to find daily data and to use in output files
 #    varConstraint: irisConstraint used to read the data
