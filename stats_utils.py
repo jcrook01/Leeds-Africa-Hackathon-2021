@@ -1,6 +1,6 @@
 #------------------------------------------------------
 # File: stats_utils
-# contains functions for calculating percentiles
+# contains functions for calculating percentiles and stats related to high impact weather
 #------------------------------------------------------------------
 
 
@@ -124,19 +124,23 @@ def get_dryspell(pr, threshold, nconsecutive_days):
     dryspell=np.zeros((nt,nlat,nlon))
     length_dryspell=np.zeros((nt,nlat,nlon))
     count_dryspell=np.zeros((nlat,nlon))
-        
+    
+    dry=np.zeros((nt+2,nlat,nlon)) # add an element at beginning and end compared to pr
+    for t in range(0,nt-nconsecutive_days):
+        this_sum=np.sum(pr[t:t+nconsecutive_days,:,:], axis=0)
+        ix=np.where(this_sum < float(threshold))
+        if len(ix[0]) > 0:
+            dry_xy=np.zeros((nlat,nlon))
+            dry_xy[ix]=1
+            dry[t+1:t+nconsecutive_days+1,:,:] = dry_xy
+            dryspell[t,:,:]=dry_xy
+
+    diffs=np.diff(dry, axis=0) # this is 1 where it becomes dry and -1 where it becomes wet and 0 where it stays the same
+    # get indices where changes occur
     for y in range(nlat):
         for x in range(nlon):
-            dry=np.zeros(nt+2) # add an element at beginning and end compared to pr
-            for t in range(0,nt-nconsecutive_days):
-                if np.sum(pr[t:t+nconsecutive_days,y,x]) < float(threshold):
-                    dry[t+1:t+nconsecutive_days+1] = 1
-                    dryspell[t,y,x]=1
-
-            diffs=np.diff(dry) # this is 1 where it becomes dry and -1 where it becomes wet and 0 where it stays the same
-            # get indices where changes occur
-            start_dry=np.where(diffs>0)[0]
-            end_dry=np.where(diffs<0)[0]
+            start_dry=np.where(diffs[:,y,x]>0)[0]
+            end_dry=np.where(diffs[:,y,x]<0)[0]
             nstart=len(start_dry)
             nend=len(end_dry)
             length_dryspell[start_dry, y,x]=end_dry-start_dry
