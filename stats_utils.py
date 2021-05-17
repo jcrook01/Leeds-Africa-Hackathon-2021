@@ -61,7 +61,7 @@ import numpy as np
 # Code to calculate when there is a heatwave defined by number of consecutive days of temperature above the 90th percentile
 #
 # inputs:
-#    tasmax - a numpy array [nt,nlat,nlon] containing tasmax to test
+#    tasmax - a numpy array [nt,nlat,nlon] containing daily tasmax to test
 #    tas90th - a numpy array [nlat,nlon] containing the 90th percentile of tas against which to test tasmax
 #    nconsecutive_days - the number of consecutive days used to define a heatwave - often 3
 # 
@@ -96,6 +96,100 @@ def get_heatwave(tasmax, tas90th, nconsecutive_days):
                     heatwave[start_hot[i]:end_hot[i],y,x]=1
 
     return heatwave
+
+#------------------------------------------------------
+# Code to calculate when there is a dry spell defined by number of consecutive days of accumulated preciptation below given threshold
+#   pr is summed over nconsecutive_days and if the sum is < threshold these days are considered a dry spell
+#   Note that pr read from model is usually rainrate per hour. This needs to be turned into a daily accumulation.
+#
+# inputs:
+#    pr - a numpy array [nt,nlat,nlon] containing daily accumulated precipitation to test
+#    threshold - the precipitation threshold to use
+#    nconsecutive_days - the number of consecutive days over which to test the precipitation threshold
+# 
+# returns:
+#    dryspell - a numpy array [nt,nlat,nlon] set to 1 where there is a dryspell
+#    length_dryspell - a numpy array [nt,nlat,nlon] where at t=start of each dry spell this gives the length of the dry spell in days
+#    count_dryspell - a numpy array [nlat,nlon] that gives the number of dryspells in each grid box
+#------------------------------------------------------------------
+# History:
+#     created by Julia Crook based on code by Rory Fitzpatrick
+#------------------------------------------------------------------
+def get_dryspell(pr, threshold, nconsecutive_days):
+    shape=np.shape(pr)
+    nt=shape[0]
+    nlat=shape[1]
+    nlon=shape[2]
+
+    dryspell=np.zeros((nt,nlat,nlon))
+    length_dryspell=np.zeros((nt,nlat,nlon))
+    count_dryspell=np.zeros((nlat,nlon))
+        
+    for y in range(nlat):
+        for x in range(nlon):
+            dry=np.zeros(nt+2) # add an element at beginning and end compared to pr
+            for t in range(0,nt-nconsecutive_days):
+                if np.sum(pr[t:t+nconsecutive_days,y,x]) < float(threshold):
+                    dry[t+1:t+nconsecutive_days+1] = 1
+                    dryspell[t,y,x]=1
+
+            diffs=np.diff(dry) # this is 1 where it becomes dry and -1 where it becomes wet and 0 where it stays the same
+            # get indices where changes occur
+            start_dry=np.where(diffs>0)[0]
+            end_dry=np.where(diffs<0)[0]
+            nstart=len(start_dry)
+            nend=len(end_dry)
+            length_dryspell[start_dry, y,x]=end_dry-start_dry
+            count_dryspell[y,x]=count_dryspell[y,x]+nstart
+
+    return dryspell, length_dryspell, count_dryspell
+
+#------------------------------------------------------
+# Code to calculate the monsoon onset
+#   this is defined as having >= day_one_threshold on day t and >= two_day_theshold over day t and t+1 and
+#   no dry spells (defined by nconsective_days_dryspell and dry_threshold) starting in the next ndryspell_days
+#
+# inputs:
+#    pr - an iris cube [nt,nlat,nlon] containing daily precipitation in mm/day
+#    day_one_threshold - defaults to 1.0 mm
+#    two_day_theshold - defaults to 20.0 mm
+#    dry_theshold - defaults to 5.0 mm
+#    nconsecutive_days_dryspell - defaults to 7 days
+#    ndryspell_days - defaults to 15 days
+# 
+# returns:
+#    onsets - a numpy array [nlat,nlon] with the day of year
+#------------------------------------------------------------------
+# History:
+#     created by Julia Crook based on code by Rory Fitzpatrick
+#------------------------------------------------------------------
+import iris.coord_categorisation
+def get_onsets(pr, day_one_threshold=1.0,two_day_theshold=20.0, dry_threshold=5.0, nconsecutive_days_dryspell=7, ndryspell_days=15):
+    nt=pr.shape[0]
+    nlat=pr.shape[1]
+    nlon=pr.shape[2]
+    
+    iris.coord_categorisation.add_day_of_year(pr, 'time', name='day_of_year')
+    days=pr.coord('day_of_year').points
+
+    ndays_to_test=ndryspell_days+nconsecutive_days_dryspell   
+    onsets=np.zeros((nlat,nlon))
+    for y in range(nlat):
+        for x in range(nlon):
+            for t in range(nt-ndays_to_test):
+                if pr.data[t,y,x] >= day_one_threshold and np.sum(pr.data[t:t+2,y,x]) >= two_day_theshold:
+                    # see if rainfall summed over nconsecutive_days_dryspell days is below dry_threshold
+                    # in the next ndryspell_days days
+                    low_rain=False
+                    for t1 in range(t+2,t+ndryspell_days):
+                        if np.sum(pr.data[t1:t1+nconsecutive_days_dryspell,y,x]) < dry_threshold:
+                            low_rain=True
+                            break
+                    if low_rain == False:
+                        # we have found the onset
+                        onsets[y,x] = days[t]
+                        break
+    return onsets
 
 if __name__=='__main__':
     main()

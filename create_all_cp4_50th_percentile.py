@@ -111,6 +111,7 @@ def main():
     stash_codes=['m01s03i236','m01s04i203'] # daily data needs to be read with stash code
     varnames=['tasmax','pr']
     nvars=len(varnames)
+    start_var=1
     nvars=1
     
     for n in range(nvars):

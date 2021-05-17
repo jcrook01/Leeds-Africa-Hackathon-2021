@@ -74,7 +74,7 @@ for m in range(1,nmonths_per_year+1):
     this_tasmax=tasmax_cc.extract(iris.Constraint(month_number = lambda cell: cell == int(m)))
     this_outfile=outfile_cc+'{m:02d}_'.format(m=m)+lonlat_str+'.nc'
     if os.path.isfile(this_outfile)==False:
-        print(this_outfile, exists)
+        print(this_outfile, 'exists')
     else:
         create_data_nth_percentile(this_tasmax, 50, this_outfile)
 
@@ -83,7 +83,7 @@ for m in range(1,nmonths_per_year+1):
 #----------------------------------------------------------------------------
 outfile_fc_vs_cc=outdir_fc+'tasmax_{y1}-{y2}_as_cc_percentile_{y3}-{y4}_'.format(y1=start_year, y2=end_year, y3=start_year2, y4=end_year2)
 for m in range(1,nmonths_per_year+1):
-    this_file_fc=outfile_fc+'{m:02d}_.nc'.format(m=m)+lonlat_str
+    this_file_fc=outfile_fc+'{m:02d}_'.format(m=m)+lonlat_str+'.nc'
     this_cc_data=tasmax_cc.extract(iris.Constraint(month_number = lambda cell: cell == int(m)))
     this_outfile=outfile_fc_vs_cc+'{m:02d}_'.format(m=m)+lonlat_str+'.nc'
     varConstraint=iris.Constraint(cube_func=(lambda c: c.var_name == varname))
